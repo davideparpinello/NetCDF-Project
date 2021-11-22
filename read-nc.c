@@ -7,7 +7,7 @@
 
 /* This is the name of the data file we will read. */
 #define FILE_NAME "/shares/HPC4DataScience/pta/CMCC-CM2-SR5_historical/pr_day_CMCC-CM2-SR5_historical_r1i1p1f1_gn_19250101-19491231.nc"
-#define WR_FILE_NAME "NetCDF-Project/cmcc-med.nc"
+#define WR_FILE_NAME "NetCDF-Project/cmcc-med-2.nc"
 
 /* We are reading 3D data, a 1 x 192 x 288 lvl-lat-lon grid, with 9125
     timesteps of data. */
@@ -26,11 +26,6 @@
 #define UNITS "units"
 #define DEGREES_EAST "degrees_east"
 #define DEGREES_NORTH "degrees_north"
-
-/* These are used to calculate the values we expect to find. */
-#define SAMPLE_PRECIPITATION 0.0
-#define START_LAT 25.0
-#define START_LON -125.0
 
 /* For the units attributes. */
 #define UNITS "units"
@@ -71,7 +66,7 @@ int main()
    float lats[NLAT], lons[NLON];
 
    /* Loop indexes. */
-   int lat, lon, rec = 0;
+   int rec = 0;
 
    /* Error handling. */
    int retval;
@@ -118,7 +113,7 @@ int main()
       the dimids of the dimensions of the variables.*/
    dimids_wr[0] = lat_dimid;
    dimids_wr[1] = lon_dimid;
-   if ((retval = nc_def_var(ncid_wr, PREC_NAME, NC_FLOAT, NDIMS, 
+   if ((retval = nc_def_var(ncid_wr, PREC_NAME, NC_FLOAT, NDIMSWR, 
 			    dimids_wr, &prec_varid_wr)))
       ERR(retval);
 
@@ -161,8 +156,6 @@ int main()
    struct timeval starttime;
    struct timeval endtime;
    double elapsed_time;
-
-   double elapsed_med = 0;
 
    int i, k;
 
