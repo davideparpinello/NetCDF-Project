@@ -57,7 +57,7 @@ int main()
    int ncid, ncid_wr, prec_varid, prec_varid_wr;
    int lat_varid, lon_varid, lat_varid_wr, lon_varid_wr, lon_dimid, lat_dimid;
 
-   int dimids_wr[NDIMS];
+   int dimids_wr[NDIMSWR];
 
    /* The start and count arrays will tell the netCDF library where to
        read our data. */
@@ -168,10 +168,9 @@ int main()
 
    float somma[NLAT][NLON] = {{0}};
 
-
-
    gettimeofday(&starttime, NULL);
    /* Read and check one record at a time. */
+   
    for (rec = 0; rec < NREC; rec++)
    {
       start[0] = rec;
@@ -187,6 +186,9 @@ int main()
       }
 
    } /* next record */
+
+   printf("Here\n\n");
+   
    
    for(i = 0; i < NLAT; i++) {
       for (k = 0; k < NLON; k++) {
@@ -194,19 +196,23 @@ int main()
       }
    }
 
+   
+
    gettimeofday(&endtime, NULL);
    elapsed_time = time_diff(&starttime, &endtime);
    printf("Tempo medio: %.7f\n\n", elapsed_time);
 
+   printf("Here\n\n");
    for(i = 0; i < NLAT; i++) {
       for (k = 0; k < NLON; k++) {
          printf("%.7f \t", somma[i][k]);
       }
+      fflush(stdout); 
       printf("\n");
    }
 
-   printf("\n");
-   printf("\n");
+   printf("Here\n\n");
+   
 
    /* Write the coordinate variable data. This will put the latitudes
       and longitudes of our data grid into the netCDF file. */
@@ -214,6 +220,8 @@ int main()
       ERR(retval);
    if ((retval = nc_put_var_float(ncid_wr, lon_varid_wr, &lons[0])))
       ERR(retval);
+
+   printf("Here\n\n");
 
    /* Write the pretend data. This will write our surface pressure and
       surface temperature data. The arrays of data are the same size
