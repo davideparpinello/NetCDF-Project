@@ -120,8 +120,6 @@ int main()
       if ((retval = nc_get_var1_float(ncid, prec_varid, start, &data)))
          ERR(retval);
 
-      printf("Day: %d Data %.7f\n", rec, data);
-
       somma += data;
 
    } /* next record */
