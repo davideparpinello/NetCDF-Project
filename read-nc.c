@@ -6,7 +6,8 @@
 #include <sys/time.h>
 
 /* This is the name of the data file we will read. */
-#define FILE_NAME "/shares/HPC4DataScience/pta/CMCC-CM2-SR5_historical/pr_day_CMCC-CM2-SR5_historical_r1i1p1f1_gn_19250101-19491231.nc"
+//#define FILE_NAME "/shares/HPC4DataScience/pta/CMCC-CM2-SR5_historical/pr_day_CMCC-CM2-SR5_historical_r1i1p1f1_gn_19250101-19491231.nc"
+#define FILE_NAME "NetCDF-Project/pr_day_CMCC-CM2-SR5_historical_r1i1p1f1_gn_19500101-19741231.nc"
 #define WR_FILE_NAME "NetCDF-Project/cmcc-med-2.nc"
 
 /* We are reading 3D data, a 1 x 192 x 288 lvl-lat-lon grid, with 9125
@@ -154,48 +155,61 @@ int main()
    start[2] = 0;
 
    struct timeval starttime;
+   struct timeval starttime2;
    struct timeval endtime;
    double elapsed_time;
+   double elapsed_time_lettura;
+   double elapsed_time_matrice;
 
    int i, k;
 
    float somma[NLAT][NLON] = {{0}};
 
-   gettimeofday(&starttime, NULL);
+   
    /* Read and check one record at a time. */
    
-   for (rec = 0; rec < NREC; rec++)
-   {
-      start[0] = rec;
+   for (rec = 0; rec < NREC; rec++)  
+   {                                         // in media 15 secondi 
+      gettimeofday(&starttime, NULL);
+      start[0] = rec;   //output dependence
 
       if ((retval = nc_get_vara_float(ncid, prec_varid, start,
                                       count, &prec_in[0][0])))
          ERR(retval);
+      
+      gettimeofday(&endtime, NULL);
+      elapsed_time = time_diff(&starttime, &endtime);
+      elapsed_time_lettura+=elapsed_time;
+      printf("Tempo lettura: %.7f\n\n", elapsed_time);
+      //printf("Here\n");
 
+      gettimeofday(&starttime, NULL);
       for(i = 0; i < NLAT; i++) {
          for (k = 0; k < NLON; k++) {
-            somma[i][k] += prec_in[i][k];
+            somma[i][k] += prec_in[i][k];      //reduction
          }
       }
+       gettimeofday(&endtime, NULL);
+      elapsed_time = time_diff(&starttime, &endtime);
+      elapsed_time_matrice+=elapsed_time;
+      printf("Tempo creazione matrice: %.7f\n\n", elapsed_time);
 
    } /* next record */
 
-   printf("Here\n\n");
-   
-   
+   printf("Tempo totale di lettura matrici: %.7f\n", elapsed_time_lettura);
+   printf("Tempo totale di scrittura matrice media: %.7f\n", elapsed_time_matrice);
+   gettimeofday(&starttime, NULL);
    for(i = 0; i < NLAT; i++) {
       for (k = 0; k < NLON; k++) {
          somma[i][k] = somma[i][k] / NREC;
       }
    }
 
-   
-
    gettimeofday(&endtime, NULL);
    elapsed_time = time_diff(&starttime, &endtime);
-   printf("Tempo medio: %.7f\n\n", elapsed_time);
+   printf("Tempo analisi: %.7f\n\n", elapsed_time);
 
-   printf("Here\n\n");
+   //printf("Here\n\n");
    for(i = 0; i < NLAT; i++) {
       for (k = 0; k < NLON; k++) {
          printf("%.7f \t", somma[i][k]);
@@ -204,7 +218,7 @@ int main()
       printf("\n");
    }
 
-   printf("Here\n\n");
+   //printf("Here\n\n");
    
 
    /* Write the coordinate variable data. This will put the latitudes
