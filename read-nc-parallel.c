@@ -1,5 +1,8 @@
 /* Copyright 2006-2011 University Corporation for Atmospheric
  Research/Unidata. See COPYRIGHT file for conditions of use. */
+
+
+ //to compile: mpicc -g -Wall -o read-nc-parallel read-nc-parallel.c -I/apps/netCDF4.7.0/include -L/apps/netCDF4.7.0/lib -lnetcdf -lm -ldl -lz -lcurl -std=c99
 #include <stdio.h>
 #include <string.h>
 #include <netcdf.h>
@@ -260,6 +263,8 @@ int main(int argc, char *argv[])
         elapsed_time = time_diff(&starttime2, &endtime2);
         printf("Tempo rank0: %.7f\n\n", elapsed_time);
 
+
+        //stampa matrice di media
         for(i = 0; i < NLAT; i++) {
             for (k = 0; k < NLON; k++) {
                 printf("%.7f \t", somma_finale[i][k]);
