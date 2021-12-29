@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
     
     int giorni_per_proc= NREC/size;    // se 125 processi, ho 73 giorni x proc    1, 5, 25, 73, 125, 365, 1825, 9125  num proc possibili
     if(rank==0){
-        printf("Numero processi: %d (giorni per processo: %d)\n",size, giorni_per_proc);
+        printf("Numero processi: %d (giorni elaborati per processo: %d)\n",size, giorni_per_proc);
     }
     /* Read and check one record at a time. */
    
@@ -228,18 +228,29 @@ int main(int argc, char *argv[])
 
     //matrice ricreata a partire da arraytot
     float somma_finale[NLAT][NLON] = {{0}};
-    
+
+    double somma_tempi_read;
+    double somma_tempi_writematrx;
+
+
+    gettimeofday(&starttime, NULL);
+    MPI_Reduce(&elapsed_time_lettura, &somma_tempi_read, 1, MPI_DOUBLE, MPI_SUM, 0 , MPI_COMM_WORLD);
+    MPI_Reduce(&elapsed_time_matrice, &somma_tempi_writematrx, 1, MPI_DOUBLE, MPI_SUM, 0 , MPI_COMM_WORLD);
     MPI_Reduce(array_matr, &arraytot, NLAT*NLON , MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-        
-        
-    printf("My rank: %d\n" , rank);
+    gettimeofday(&endtime, NULL);
+    elapsed_time = time_diff(&starttime, &endtime);
+    //printf("Tempo comunicazione: %.7f\n\n", elapsed_time);
+    
+    /*printf("My rank: %d\n" , rank);
     printf("Tempo totale di lettura matrici: %.7f\n", elapsed_time_lettura);
     printf("Tempo totale di scrittura matrice media: %.7f\n\n", elapsed_time_matrice);
-    
+    */
     
     if(rank==0){
-       
+        printf("Tempo medio di lettura matrici per processo: %.7f\n", somma_tempi_read/size);
+        printf("Tempo medio di scrittura matrice somma per processo: %.7f\n", somma_tempi_writematrx/size);
         //ricreo matrice da array monodim
+        gettimeofday(&starttime, NULL);
         for(i = 0; i < NLAT; ++i) {    
             for (k = 0; k < NLON; ++k) {
                 somma_finale[i][k] = arraytot[i*NLON+k];
@@ -247,7 +258,7 @@ int main(int argc, char *argv[])
         }
 
         //calcolo media
-        gettimeofday(&starttime, NULL);
+        
         for(i = 0; i < NLAT; i++) {
             for (k = 0; k < NLON; k++) {
                 somma_finale[i][k] = somma_finale[i][k] / NREC;
@@ -261,10 +272,11 @@ int main(int argc, char *argv[])
 
         gettimeofday(&endtime2, NULL);
         elapsed_time = time_diff(&starttime2, &endtime2);
-        printf("Tempo rank0: %.7f\n\n", elapsed_time);
+        printf("Tempo elaborazione totale rank0: %.7f\n\n", elapsed_time);
 
 
         //stampa matrice di media
+        /*
         for(i = 0; i < NLAT; i++) {
             for (k = 0; k < NLON; k++) {
                 printf("%.7f \t", somma_finale[i][k]);
@@ -272,6 +284,7 @@ int main(int argc, char *argv[])
             fflush(stdout); 
             printf("\n");
         }
+        */
 
    
         
