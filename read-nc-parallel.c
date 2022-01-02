@@ -34,7 +34,8 @@
 
 /* For the units attributes. */
 #define UNITS "units"
-#define PREC_UNITS "kg m-2 s-1"
+//#define PREC_UNITS "kg m-2 s-1"
+#define PREC_UNITS "mm per day"
 #define LAT_UNITS "degrees_north"
 #define LON_UNITS "degrees_east"
 #define MAX_ATT_LEN 80
@@ -257,11 +258,11 @@ int main(int argc, char *argv[])
             }
         }
 
-        //calcolo media
+        //calcolo media e conversione unità misura
         
         for(i = 0; i < NLAT; i++) {
             for (k = 0; k < NLON; k++) {
-                somma_finale[i][k] = somma_finale[i][k] / NREC;
+                somma_finale[i][k] = (somma_finale[i][k] / NREC) * 86400;
             }
         }
 
@@ -300,7 +301,7 @@ int main(int argc, char *argv[])
         /* Write the pretend data. This will write our surface pressure and
             surface temperature data. The arrays of data are the same size
             as the netCDF variables we have defined. */
-        if ((retval = nc_put_var_float(ncid_wr, prec_varid_wr, &somma[0][0])))
+        if ((retval = nc_put_var_float(ncid_wr, prec_varid_wr, &somma_finale[0][0])))
             ERR(retval);
 
         /* Close the file. */
