@@ -29,7 +29,7 @@
 
 /* For the units attributes. */
 #define UNITS "units"
-#define PREC_UNITS "kg m-2 s-1"
+#define PREC_UNITS "mm per day"
 #define LAT_UNITS "degrees_north"
 #define LON_UNITS "degrees_east"
 #define MAX_ATT_LEN 80
