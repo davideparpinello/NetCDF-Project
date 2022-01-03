@@ -1,7 +1,7 @@
 /* Copyright 2006-2011 University Corporation for Atmospheric
  Research/Unidata. See COPYRIGHT file for conditions of use. */
 
-//to compile: mpicc -g -Wall -o read-nc-parallel-multiplefiles read-nc-parallel-multiplefiles.c -I/apps/netCDF4.7.0/include -L/apps/netCDF4.7.0/lib -lnetcdf -lm -ldl -lz -lcurl -std=gnu99
+//to compile: mpicc -g -Wall -o read-nc-parallel-all read-nc-parallel-all.c -I/apps/netCDF4.7.0/include -L/apps/netCDF4.7.0/lib -lnetcdf -lm -ldl -lz -lcurl -std=gnu99
 // -Wall enables all compiler's warning messages
 // -g default debug information
 // -o  xxxxxx output name
@@ -19,7 +19,7 @@
 /* This is the name of the data file we will read. */
 //#define FILE_NAME "/shares/HPC4DataScience/pta/CMCC-CM2-SR5_historical/pr_day_CMCC-CM2-SR5_historical_r1i1p1f1_gn_19250101-19491231.nc"
 //#define FILE_NAME "NetCDF-Project/pr_day_CMCC-CM2-SR5_historical_r1i1p1f1_gn_19500101-19741231.nc"
-//#define WR_FILE_NAME "NetCDF-Project/cmcc-med-2.nc"
+#define WR_FILE_NAME "NetCDF-Project/cmcc-med-final.nc"
 
 #define FILES_FOLDER "NetCDF-Project/CMCC-CM2-SR5_historical"
 
@@ -62,7 +62,6 @@ float time_diff(struct timeval *start, struct timeval *end)
     return (end->tv_sec - start->tv_sec) + 1e-6 * (end->tv_usec - start->tv_usec);
 }
 
-
 int main(int argc, char *argv[])
 {
     /* MPI  inizialization */
@@ -73,7 +72,6 @@ int main(int argc, char *argv[])
 
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    
 
     /* reading files from specific directory containing NetCDF matrices */
 
@@ -93,8 +91,8 @@ int main(int argc, char *argv[])
     while ((file = readdir(directory)) != NULL)
     {
         if (file->d_type == DT_REG)
-        { /* If the entry is a regular file */
-            file_count++;  //increase the counter containing the total number of files inside the dir
+        {                 /* If the entry is a regular file */
+            file_count++; //increase the counter containing the total number of files inside the dir
         }
     }
 
@@ -103,19 +101,18 @@ int main(int argc, char *argv[])
     /* array containing all the names of the different files inside the directory */
     char *filesList[file_count];
 
-    int counter=0;
-    
+    int counter = 0;
+
     directory = opendir(FILES_FOLDER);
 
-    
     while ((file = readdir(directory)) != NULL)
         if (file->d_type == DT_REG)
         {
-            char name[250];   //variable containing the file path
+            char name[250]; //variable containing the file path
             strcpy(name, "NetCDF-Project/CMCC-CM2-SR5_historical/");
-            strcat(name, file->d_name);   // append the name of file onto the folder path 
-            filesList[counter] = (char*) malloc (strlen(name)+1);  //allocating memory for filesList individual elements.
-            strncpy (filesList[counter], name, strlen(name));
+            strcat(name, file->d_name);                            // append the name of file onto the folder path
+            filesList[counter] = (char *)malloc(strlen(name) + 1); //allocating memory for filesList individual elements.
+            strncpy(filesList[counter], name, strlen(name));
             //filesList[counter] = name;
             counter++;
         }
@@ -126,10 +123,14 @@ int main(int argc, char *argv[])
     {
         printf("String: %s\n", filesList[i]);
     }*/
-    
 
     /*array of matrices containing all the different output average matrices calculated for each file (25 years) */
-    double **final_averages[file_count];
+    float *final_averages = malloc(file_count * NLAT * NLON * sizeof(float));
+
+    /* These program variables hold the latitudes and longitudes. */
+    float lats[NLAT], lons[NLON];
+
+    int nrec_array[file_count];
 
     /* loop for each file (numbered by counter); every process will open the same file and perform the reading and the calculation; 
         the next iteration the next file and so on */
@@ -140,7 +141,7 @@ int main(int argc, char *argv[])
         int lat_varid, lon_varid;
 
         /* variable containing the name of the current file to be opened and read */
-        char filename[250];   
+        char filename[250];
 
         /* copy the name of the current file, contained in the array filesList, to the variable filename */
         strcpy(filename, filesList[counter]);
@@ -150,7 +151,9 @@ int main(int argc, char *argv[])
             nrec = 9125;
         else
             nrec = 5475;
-            
+
+        nrec_array[counter] = nrec;
+
         /* setup of NetCDF reading */
 
         /* The start and count arrays will tell the netCDF library where to read our data. */
@@ -158,9 +161,6 @@ int main(int argc, char *argv[])
 
         /* Program variables to hold the data we will read. We will only need enough space to hold one timestep of data; one record. */
         float prec_in[NLAT][NLON];
-
-        /* These program variables hold the latitudes and longitudes. */
-        float lats[NLAT], lons[NLON];
 
         /* Loop indexes. */
         int rec = 0;
@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
         /* Open the file. */
         if ((retval = nc_open(filename, NC_NOWRITE, &ncid)))
             ERR(retval);
-        
+
         /* Get the varids of the latitude and longitude coordinate variables. */
         if ((retval = nc_inq_varid(ncid, LAT_NAME, &lat_varid)))
             ERR(retval);
@@ -203,27 +203,26 @@ int main(int argc, char *argv[])
         struct timeval starttime;
         struct timeval starttime2;
         struct timeval endtime;
-        struct timeval endtime2;
+        //struct timeval endtime2;
 
-        double elapsed_time=0;           //variable containing the elapsed time 
-        double elapsed_time_reading=0;   //variable containing the local sum of all elapsed time for reading
-        double elapsed_time_matrix=0;    //variable containing the local sum of all elapsed time for writing the sum matrix
-
+        double elapsed_time = 0;         //variable containing the elapsed time
+        double elapsed_time_reading = 0; //variable containing the local sum of all elapsed time for reading
+        double elapsed_time_matrix = 0;  //variable containing the local sum of all elapsed time for writing the sum matrix
 
         /* loop iteration variables */
-        int i, k;   
+        int i, k;
 
         /* sum matrix */
         float sum[NLAT][NLON] = {{0}};
-        
-        
+
         /* if 25 processes, 365 days elaborated by each proc */
         int days_per_proc = ceil((double)nrec / size);
-        
-        int limit= (rank+1)*days_per_proc;
-       
-        if(limit > nrec){
-            limit=nrec;
+
+        int limit = (rank + 1) * days_per_proc;
+
+        if (limit > nrec)
+        {
+            limit = nrec;
         }
 
         //printf("Limit: %d\n", limit);
@@ -235,25 +234,24 @@ int main(int argc, char *argv[])
             printf("Number of processes: %d (days elaborated by each process: %d)\n", size, days_per_proc);
         }
 
-        
         gettimeofday(&starttime2, NULL); //start timer of rank 0
-        
+
         /* Read and check one record at a time.
             if 125 processes, rank 0 from day 0 to day 72, rank 1 from 73 to 145 ... */
         for (rec = rank * days_per_proc; rec < limit; rec++)
         {
-            gettimeofday(&starttime, NULL);     //start reading timer
+            gettimeofday(&starttime, NULL); //start reading timer
 
-            start[0] = rec;     //starting day to elaborate
+            start[0] = rec; //starting day to elaborate
 
-            /*read the information */ 
+            /*read the information */
             if ((retval = nc_get_vara_float(ncid, prec_varid, start, count, &prec_in[0][0])))
                 ERR(retval);
 
             /*end of reading timer and calculation of elapsed time */
             gettimeofday(&endtime, NULL);
             elapsed_time = time_diff(&starttime, &endtime);
-            elapsed_time_reading += elapsed_time;     
+            elapsed_time_reading += elapsed_time;
             //printf("Tempo lettura: %.7f\n\n", elapsed_time);
 
             /* start elaboration timer */
@@ -264,7 +262,7 @@ int main(int argc, char *argv[])
             {
                 for (k = 0; k < NLON; k++)
                 {
-                    sum[i][k] += prec_in[i][k]; 
+                    sum[i][k] += prec_in[i][k];
                 }
             }
 
@@ -280,27 +278,26 @@ int main(int argc, char *argv[])
         int *array_matr = (int *)sum;
 
         //one-dimensional array containing the output of Reduce operation
-        float arraytot[NLAT * NLON];
+        //float arraytot[NLAT * NLON];
 
         //matrix recreated from mono-dim array
-        float final_sum_matrix[NLAT][NLON] = {{0}};
+        //float final_sum_matrix[NLAT][NLON] = {{0}};
 
-
-        double sum_readtimes;   // variable containing the output of reduce operation, collecting all reading times of different processes
+        double sum_readtimes;        // variable containing the output of reduce operation, collecting all reading times of different processes
         double sum_elaborationtimes; // variable containing the output of reduce operation, collecting all elaboration times of different processes
 
-        gettimeofday(&starttime, NULL);  // start communication timer
+        gettimeofday(&starttime, NULL); // start communication timer
 
         /* three MPI_Reduce, to collect the local contibutes of reading timer, elaboration timer, and most importantly the local sum matrix. */
         MPI_Reduce(&elapsed_time_reading, &sum_readtimes, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
         MPI_Reduce(&elapsed_time_matrix, &sum_elaborationtimes, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-        MPI_Reduce(array_matr, &arraytot, NLAT * NLON, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+        MPI_Reduce(array_matr, &final_averages[counter * NLAT * NLON], NLAT * NLON, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
 
         /*end of communication timer and calculation of elapsed time */
         gettimeofday(&endtime, NULL);
         elapsed_time = time_diff(&starttime, &endtime);
 
-        //printf("Tempo comunicazione: %.7f\n\n", elapsed_time);
+        printf("Tempo comunicazione: %.7f\n\n", elapsed_time);
 
         /*printf("My rank: %d\n" , rank);
         printf("Tempo totale di lettura matrici: %.7f\n", elapsed_time_lettura);
@@ -308,146 +305,166 @@ int main(int argc, char *argv[])
         */
 
         /* only master process will execute this */
-        if (rank == 0)
-        {
-            printf("Average reading time per process: %.7f\n", sum_readtimes / size);
-            printf("Average elaboration of sum matrix per process: %.7f\n", sum_elaborationtimes / size);
+        // if (rank == 0)
+        // {
+        //     printf("Average reading time per process: %.7f\n", sum_readtimes / size);
+        //     printf("Average elaboration of sum matrix per process: %.7f\n", sum_elaborationtimes / size);
+
+        //     //regeneration of sum matrix from mono-dim array
+        //     gettimeofday(&starttime, NULL);
+        //     /*for (i = 0; i < NLAT; ++i)
+        //     {
+        //         for (k = 0; k < NLON; ++k)
+        //         {
+        //             final_sum_matrix[i][k] = arraytot[i * NLON + k];
+        //         }
+        //     }*/
+
+        //     // from sum matrix, calculation of average by dividing by the number of days
+        //     /*for (i = 0; i < NLAT; i++)
+        //     {
+        //         for (k = 0; k < NLON; k++)
+        //         {
+        //             final_sum_matrix[i][k] = (final_sum_matrix[i][k] / nrec) * 86400; //conversion of unit, from kg m-2 s-1 to mm/day
+        //         }
+        //     }*/
+
+        //     for (i = counter * NLAT * NLON; i < (counter + 1) * NLAT * NLON; i++)
+        //     {
+        //         arraytot[i] *= 86400 / nrec; //conversion of unit, from kg m-2 s-1 to mm/day
+        //     }
+
+        //     gettimeofday(&endtime, NULL);
+        //     elapsed_time = time_diff(&starttime, &endtime);
+        //     printf("Time for average calculation: %.7f\n\n", elapsed_time);
+
+        //     /* end of rank0 timer */
+        //     gettimeofday(&endtime2, NULL);
+        //     elapsed_time = time_diff(&starttime2, &endtime2);
+        //     printf("Total elaboration time of master process: %.7f\n\n", elapsed_time);
+
+        //     //print average matrix
+        //     /*
+        //     for(i = 0; i < NLAT; i++) {
+        //         for (k = 0; k < NLON; k++) {
+        //             printf("%.7f \t", final_averages[counter][i][k]);
+        //         }
+        //         fflush(stdout); 
+        //         printf("\n");
+        //     }
             
-            //regeneration of sum matrix from mono-dim array
-            gettimeofday(&starttime, NULL);
-            for (i = 0; i < NLAT; ++i)
-            {
-                for (k = 0; k < NLON; ++k)
-                {
-                    final_sum_matrix[i][k] = arraytot[i * NLON + k];
-                }
-            }
+        //     */
 
-            // from sum matrix, calculation of average by dividing by the number of days
-            for (i = 0; i < NLAT; i++)
-            {
-                for (k = 0; k < NLON; k++)
-                {
-                    final_sum_matrix[i][k] = (final_sum_matrix[i][k] / nrec )* 86400;   //conversion of unit, from kg m-2 s-1 to mm/day
-                }
-            }
+        //     /* Close the file. */
+        //     if ((retval = nc_close(ncid)))
+        //         ERR(retval);
+        // }
 
-            final_averages[counter] = (double**)final_sum_matrix;
-
-            gettimeofday(&endtime, NULL);
-            elapsed_time = time_diff(&starttime, &endtime);
-            printf("Time for average calculation: %.7f\n\n", elapsed_time);
-
-            /* end of rank0 timer */
-            gettimeofday(&endtime2, NULL);
-            elapsed_time = time_diff(&starttime2, &endtime2);
-            printf("Total elaboration time of master process: %.7f\n\n", elapsed_time);
-
-            //print average matrix
-            /*
-            for(i = 0; i < NLAT; i++) {
-                for (k = 0; k < NLON; k++) {
-                    printf("%.7f \t", final_averages[counter][i][k]);
-                }
-                fflush(stdout); 
-                printf("\n");
-            }
-            
-            */
-           
-            /* Close the file. */
-            if ((retval = nc_close(ncid)))
-                ERR(retval);
-        }
-        
         //MPI_Barrier(MPI_COMM_WORLD);
-        
     }
     MPI_Finalize();
 
+    if (rank == 0)
+    {
+        // Master average matrix to calculate the final average from the final_averages matrix
+        float *master_average = calloc(NLAT * NLON, sizeof(float));
 
-    /* Writing of average matrix into a new nc file */
-    // int ncid_wr, prec_varid_wr;
-    // int lat_varid_wr, lon_varid_wr, lon_dimid, lat_dimid;
+        // From final_averages matrix, calculation of the master average
+        int i, j;
+        for (i = 0; i < file_count; i++)
+        {
+            float *average = final_averages + i * (NLAT * NLON);
+            for (j = 0; j < NLAT * NLON; j++) {
+                master_average[j] += average[j] * 86400 / nrec_array[i] / file_count;
+            }
+        }
 
-    // int dimids_wr[NDIMSWR];
+        /* Writing of average matrix into a new nc file */
+        int ncid_wr, prec_varid_wr;
+        int lat_varid_wr, lon_varid_wr, lon_dimid, lat_dimid;
+ 
+        int dimids_wr[NDIMSWR];
 
-    // struct timeval starttime;
-    // struct timeval endtime;
-    // double elapsed_time;
+        struct timeval starttime;
+        struct timeval endtime;
+        double elapsed_time;
 
-    // /* Create the file. */
-    // if ((retval = nc_create(WR_FILE_NAME, NC_CLOBBER, &ncid_wr)))
-    //     ERR(retval);
+        /* Error handling. */
+        int retval;
 
-    // /* Define the dimensions. */
-    // if ((retval = nc_def_dim(ncid_wr, LAT_NAME, NLAT, &lat_dimid)))
-    //     ERR(retval);
-    // if ((retval = nc_def_dim(ncid_wr, LON_NAME, NLON, &lon_dimid)))
-    //     ERR(retval);
+        /* Create the file. */
+        if ((retval = nc_create(WR_FILE_NAME, NC_CLOBBER, &ncid_wr)))
+            ERR(retval);
 
-    // /* Define coordinate netCDF variables. They will hold the
-    //     coordinate information, that is, the latitudes and longitudes. A
-    //     varid is returned for each.*/
-    // if ((retval = nc_def_var(ncid_wr, LAT_NAME, NC_FLOAT, 1, &lat_dimid,
-    //                 &lat_varid_wr)))
-    //     ERR(retval);
-    // if ((retval = nc_def_var(ncid_wr, LON_NAME, NC_FLOAT, 1, &lon_dimid,
-    //                 &lon_varid_wr)))
-    //     ERR(retval);
+        /* Define the dimensions. */
+        if ((retval = nc_def_dim(ncid_wr, LAT_NAME, NLAT, &lat_dimid)))
+            ERR(retval);
+        if ((retval = nc_def_dim(ncid_wr, LON_NAME, NLON, &lon_dimid)))
+            ERR(retval);
 
-    // /* Define units attributes for coordinate vars. This attaches a
-    //     text attribute to each of the coordinate variables, containing
-    //     the units. Note that we are not writing a trailing NULL, just
-    //     "units", because the reading program may be fortran which does
-    //     not use null-terminated strings. In general it is up to the
-    //     reading C program to ensure that it puts null-terminators on
-    //     strings where necessary.*/
-    // if ((retval = nc_put_att_text(ncid_wr, lat_varid_wr, UNITS,
-    //                 strlen(DEGREES_NORTH), DEGREES_NORTH)))
-    //     ERR(retval);
-    // if ((retval = nc_put_att_text(ncid_wr, lon_varid_wr, UNITS,
-    //                 strlen(DEGREES_EAST), DEGREES_EAST)))
-    //     ERR(retval);
+        /* Define coordinate netCDF variables. They will hold the
+        coordinate information, that is, the latitudes and longitudes. A
+        varid is returned for each.*/
+        if ((retval = nc_def_var(ncid_wr, LAT_NAME, NC_FLOAT, 1, &lat_dimid,
+                                 &lat_varid_wr)))
+            ERR(retval);
+        if ((retval = nc_def_var(ncid_wr, LON_NAME, NC_FLOAT, 1, &lon_dimid,
+                                 &lon_varid_wr)))
+            ERR(retval);
 
-    // /* Define the netCDF variables. The dimids array is used to pass
-    //     the dimids of the dimensions of the variables.*/
-    // dimids_wr[0] = lat_dimid;
-    // dimids_wr[1] = lon_dimid;
-    // if ((retval = nc_def_var(ncid_wr, PREC_NAME, NC_FLOAT, NDIMSWR,
-    //                 dimids_wr, &prec_varid_wr)))
-    //     ERR(retval);
+        /* Define units attributes for coordinate vars. This attaches a
+        text attribute to each of the coordinate variables, containing
+        the units. Note that we are not writing a trailing NULL, just
+        "units", because the reading program may be fortran which does
+        not use null-terminated strings. In general it is up to the
+        reading C program to ensure that it puts null-terminators on
+        strings where necessary.*/
+        if ((retval = nc_put_att_text(ncid_wr, lat_varid_wr, UNITS,
+                                      strlen(DEGREES_NORTH), DEGREES_NORTH)))
+            ERR(retval);
+        if ((retval = nc_put_att_text(ncid_wr, lon_varid_wr, UNITS,
+                                      strlen(DEGREES_EAST), DEGREES_EAST)))
+            ERR(retval);
 
-    //     /* Define units attributes for vars. */
-    // if ((retval = nc_put_att_text(ncid_wr, prec_varid_wr, UNITS,
-    //                 strlen(PREC_UNITS), PREC_UNITS)))
-    //     ERR(retval);
+        /* Define the netCDF variables. The dimids array is used to pass
+        the dimids of the dimensions of the variables.*/
+        dimids_wr[0] = lat_dimid;
+        dimids_wr[1] = lon_dimid;
+        if ((retval = nc_def_var(ncid_wr, PREC_NAME, NC_FLOAT, NDIMSWR,
+                                 dimids_wr, &prec_varid_wr)))
+            ERR(retval);
 
-    // /* End define mode. */
-    // if ((retval = nc_enddef(ncid_wr)))
-    //     ERR(retval);
+        /* Define units attributes for vars. */
+        if ((retval = nc_put_att_text(ncid_wr, prec_varid_wr, UNITS,
+                                      strlen(PREC_UNITS), PREC_UNITS)))
+            ERR(retval);
 
-    // gettimeofday(&starttime, NULL);
-    // /* Write the coordinate variable data. This will put the latitudes
-    //     and longitudes of our data grid into the netCDF file. */
-    // if ((retval = nc_put_var_float(ncid_wr, lat_varid_wr, &lats[0])))
-    //     ERR(retval);
-    // if ((retval = nc_put_var_float(ncid_wr, lon_varid_wr, &lons[0])))
-    //     ERR(retval);
+        /* End define mode. */
+        if ((retval = nc_enddef(ncid_wr)))
+            ERR(retval);
 
-    // /* Write the pretend data. This will write our surface pressure and
-    //     surface temperature data. The arrays of data are the same size
-    //     as the netCDF variables we have defined. */
-    // if ((retval = nc_put_var_float(ncid_wr, prec_varid_wr, &sum[0][0])))
-    //     ERR(retval);
+        gettimeofday(&starttime, NULL);
+        /* Write the coordinate variable data. This will put the latitudes
+        and longitudes of our data grid into the netCDF file. */
+        if ((retval = nc_put_var_float(ncid_wr, lat_varid_wr, &lats[0])))
+            ERR(retval);
+        if ((retval = nc_put_var_float(ncid_wr, lon_varid_wr, &lons[0])))
+            ERR(retval);
 
-    // /* Close the file. */
-    // if ((retval = nc_close(ncid_wr)))
-    //     ERR(retval);
+        /* Write the pretend data. This will write our surface pressure and
+        surface temperature data. The arrays of data are the same size
+        as the netCDF variables we have defined. */
+        if ((retval = nc_put_var_float(ncid_wr, prec_varid_wr, master_average)))
+            ERR(retval);
 
-    // gettimeofday(&endtime, NULL);
-    // elapsed_time = time_diff(&starttime, &endtime);
-    // printf("Tempo scrittura su file: %.7f\n\n", elapsed_time);
+        /* Close the file. */
+        if ((retval = nc_close(ncid_wr)))
+            ERR(retval);
+
+        gettimeofday(&endtime, NULL);
+        elapsed_time = time_diff(&starttime, &endtime);
+        printf("Tempo scrittura su file: %.7f\n\n", elapsed_time);
+    }
 
     return 0;
 }
