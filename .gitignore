@@ -1,2 +1,5 @@
 *.nc
 *.sh.*
+read-nc-parallel-all
+read-nc-parallel-all.c
+read-nc-parallel-all.sh
