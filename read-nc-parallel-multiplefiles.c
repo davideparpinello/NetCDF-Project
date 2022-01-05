@@ -15,6 +15,7 @@
 #include <math.h>
 #include <dirent.h>
 #include <mpi.h>
+#include <omp.h>
 
 /* This is the name of the data file we will read. */
 //#define FILE_NAME "/shares/HPC4DataScience/pta/CMCC-CM2-SR5_historical/pr_day_CMCC-CM2-SR5_historical_r1i1p1f1_gn_19250101-19491231.nc"
@@ -64,6 +65,8 @@ float time_diff(struct timeval *start, struct timeval *end)
 
 int main(int argc, char *argv[])
 {
+    //int thread_count = strtol(argv[1], NULL, 10);
+    
     /* MPI  inizialization */
     MPI_Init(&argc, &argv);
 
@@ -265,8 +268,12 @@ int main(int argc, char *argv[])
             gettimeofday(&starttime, NULL);
 
             /* population of sum matrix */
+            #   pragma omp parallel for reduction(+:sum) private(i,k) schedule(guided)
             for (i = 0; i < NLAT; i++)
-            {
+            {   
+                //int my_rank = omp_get_thread_num();
+                //int thread_count = omp_get_num_threads();
+                //printf("Hello from thread %d of %d \n", my_rank, thread_count);
                 for (k = 0; k < NLON; k++)
                 {
                     sum[i][k] += prec_in[i][k];
