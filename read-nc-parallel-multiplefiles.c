@@ -15,6 +15,7 @@
 #include <math.h>
 #include <dirent.h>
 #include <mpi.h>
+#include <omp.h>
 
 /* This is the name of the data file we will read. */
 //#define FILE_NAME "/shares/HPC4DataScience/pta/CMCC-CM2-SR5_historical/pr_day_CMCC-CM2-SR5_historical_r1i1p1f1_gn_19250101-19491231.nc"
@@ -265,10 +266,12 @@ int main(int argc, char *argv[])
             gettimeofday(&starttime, NULL);
 
             /* population of sum matrix */
+            #  pragma omp parallel for collapse(2) default(shared) private(i, k) reduction(+:sum) schedule(guided)
             for (i = 0; i < NLAT; i++)
             {
                 for (k = 0; k < NLON; k++)
                 {
+                    
                     sum[i][k] += prec_in[i][k];
                 }
             }
@@ -400,8 +403,9 @@ int main(int argc, char *argv[])
             for (j = 0; j < NLAT * NLON; j++) {
                 master_average[j] += average[j] * 86400 / nrec_array[i] / file_count;
             }
-        }
 
+        }
+        //printf("%.7f \t", master_average);
         /* Writing of average matrix into a new nc file */
         
         int ncid_wr, prec_varid_wr;
