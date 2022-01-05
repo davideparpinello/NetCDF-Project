@@ -65,6 +65,8 @@ float time_diff(struct timeval *start, struct timeval *end)
 
 int main(int argc, char *argv[])
 {
+    //int thread_count = strtol(argv[1], NULL, 10);
+    
     /* MPI  inizialization */
     MPI_Init(&argc, &argv);
 
@@ -266,9 +268,16 @@ int main(int argc, char *argv[])
             gettimeofday(&starttime, NULL);
 
             /* population of sum matrix */
+<<<<<<< HEAD
             #  pragma omp parallel for collapse(2) default(shared) private(i, k) reduction(+:sum) schedule(guided)
+=======
+            #   pragma omp parallel for reduction(+:sum) private(i,k) schedule(guided)
+>>>>>>> c2b6d9fb13663870ebf7b49381edbf1b5223f441
             for (i = 0; i < NLAT; i++)
-            {
+            {   
+                //int my_rank = omp_get_thread_num();
+                //int thread_count = omp_get_num_threads();
+                //printf("Hello from thread %d of %d \n", my_rank, thread_count);
                 for (k = 0; k < NLON; k++)
                 {
                     
