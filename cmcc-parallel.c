@@ -230,7 +230,11 @@ int main(int argc, char *argv[])
             limit = nrec;
         }
 
-        
+        int threadnumb;
+        /* Get the total number of active threads in the program */
+        #pragma omp parallel {
+            threadnumb = omp_get_num_threads();
+        }
         /* only master process writes general info about current iteration */
         if (rank == 0)
         {
