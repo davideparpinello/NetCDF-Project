@@ -1,12 +1,11 @@
-/* Copyright 2006-2011 University Corporation for Atmospheric
- Research/Unidata. See COPYRIGHT file for conditions of use. */
+//to compile: mpicc -fopenmp -g -Wall -o mpi-esm-parallel mpi-esm-parallel.c -I/apps/netCDF4.7.0/include -L/apps/netCDF4.7.0/lib -lnetcdf -lm -ldl -lz -lcurl -std=gnu99
 
-//to compile: mpicc -fopenmp -g -Wall -o mpi-esm-read-parallel mpi-esm-read-parallel.c -I/apps/netCDF4.7.0/include -L/apps/netCDF4.7.0/lib -lnetcdf -lm -ldl -lz -lcurl -std=gnu99
 // -Wall enables all compiler's warning messages
 // -g default debug information
 // -o  xxxxxx output name
 // yyyyy.c input name
 // -I, -L, -lnetcdf etc. , flags for NetCdf linking
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +29,7 @@
 #define LON_NAME "lon"
 #define REC_NAME "time"
 
+/* THe number of dimensions that the output file will have */
 #define NDIMSWR 2
 
 /* Names of things. */
@@ -62,7 +62,6 @@ float time_diff(struct timeval *start, struct timeval *end)
 
 int main(int argc, char *argv[])
 {
-
     /* MPI  inizialization */
     MPI_Init(&argc, &argv);
 
@@ -72,8 +71,15 @@ int main(int argc, char *argv[])
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    /* reading files from specific directory containing NetCDF matrices */
+    char processor_name[MPI_MAX_PROCESSOR_NAME];
+    int name_len;
+    MPI_Get_processor_name(processor_name, &name_len);
 
+    // Print off a hello world message with processor name
+    printf("greetings:  %s, rank %d out of %d processors\n",
+           processor_name, rank, size);
+
+    /* reading files from specific directory containing NetCDF matrices */
     struct dirent *file; // Pointer for directory entry
 
     // opendir() returns a pointer of DIR type.
@@ -126,12 +132,13 @@ int main(int argc, char *argv[])
     double total_time = 0;
     gettimeofday(&starttime2, NULL); //start timer of rank 0
 
-    /*array of matrices containing all the different output average matrices calculated for each file (25 years) */
+    /*array of matrices containing all the different output average matrices calculated for each file*/
     float *final_averages = malloc(file_count * NLAT * NLON * sizeof(float));
 
     /* These program variables hold the latitudes and longitudes. */
     float lats[NLAT], lons[NLON];
 
+    /* This array will hold the number of records for each iteration, it will be used to calculate the final averages */
     int nrec_array[file_count];
 
     double total_time_reading;
@@ -225,13 +232,13 @@ int main(int argc, char *argv[])
             limit = nrec;
         }
 
-        //printf("Limit: %d\n", limit);
-
+        int threadnumb = omp_get_num_threads();
         /* only master process writes general info about current iteration */
         if (rank == 0)
         {
             printf("Elaborated file: %s (counter: %d) \n", filename, counter);
             printf("Number of processes: %d (days elaborated by each process: %d)\n", size, days_per_proc);
+            printf("Number of threads: %d \n", threadnumb);
             gettimeofday(&starttime3, NULL); //start timer of rank0
         }
 
@@ -251,18 +258,17 @@ int main(int argc, char *argv[])
             gettimeofday(&endtime, NULL);
             elapsed_time = time_diff(&starttime, &endtime);
             elapsed_time_reading += elapsed_time;
-            //printf("Tempo lettura: %.7f\n\n", elapsed_time);
 
             /* start elaboration timer */
             gettimeofday(&starttime, NULL);
 
-            /* population of sum matrix with OpenMP parallel for */
-            #  pragma omp parallel for collapse(2) private(i, k) reduction(+:sum) schedule(guided)
+/* population of sum matrix with OpenMP parallel for */
+#pragma omp parallel for collapse(2) private(i, k) reduction(+ \
+                                                             : sum) schedule(guided)
             for (i = 0; i < NLAT; i++)
             {
                 for (k = 0; k < NLON; k++)
                 {
-
                     sum[i][k] += prec_in[i][k];
                 }
             }
@@ -271,7 +277,6 @@ int main(int argc, char *argv[])
             gettimeofday(&endtime, NULL);
             elapsed_time = time_diff(&starttime, &endtime);
             elapsed_time_matrix += elapsed_time;
-
         } /* next record */
 
         //pointer to sum matrix, to consider the matrix as an array.
@@ -289,8 +294,6 @@ int main(int argc, char *argv[])
         /*end of communication timer and calculation of elapsed time */
         gettimeofday(&endtime, NULL);
         elapsed_time = time_diff(&starttime, &endtime);
-
-        //printf("Tempo comunicazione: %.7f num. proc: %d \n\n", elapsed_time, rank);
 
         if (rank == 0)
         {
@@ -310,7 +313,6 @@ int main(int argc, char *argv[])
 
     if (rank == 0)
     {
-
         // Master average matrix to calculate the final average from the final_averages matrix
         float *master_average = calloc(NLAT * NLON, sizeof(float));
 
@@ -324,8 +326,8 @@ int main(int argc, char *argv[])
                 master_average[j] += average[j] * 86400 / nrec_array[i] / file_count;
             }
         }
-        /* Writing of average matrix into a new nc file */
 
+        /* Writing of average matrix into a new nc file */
         int ncid_wr, prec_varid_wr;
         int lat_varid_wr, lon_varid_wr, lon_dimid, lat_dimid;
 

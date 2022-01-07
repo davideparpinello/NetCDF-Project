@@ -1,12 +1,11 @@
-/* Copyright 2006-2011 University Corporation for Atmospheric
- Research/Unidata. See COPYRIGHT file for conditions of use. */
-
 //to compile: mpicc -g -Wall -o cmcc-parallel cmcc-parallel.c -I/apps/netCDF4.7.0/include -L/apps/netCDF4.7.0/lib -lnetcdf -lm -ldl -lz -lcurl -std=gnu99 -fopenmp
+
 // -Wall enables all compiler's warning messages
 // -g default debug information
 // -o  xxxxxx output name
 // yyyyy.c input name
 // -I, -L, -lnetcdf etc. , flags for NetCdf linking
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,12 +16,10 @@
 #include <mpi.h>
 #include <omp.h>
 
-/* This is the name of the data file we will read. */
-//#define FILE_NAME "/shares/HPC4DataScience/pta/CMCC-CM2-SR5_historical/pr_day_CMCC-CM2-SR5_historical_r1i1p1f1_gn_19250101-19491231.nc"
-//#define FILE_NAME "NetCDF-Project/pr_day_CMCC-CM2-SR5_historical_r1i1p1f1_gn_19500101-19741231.nc"
+/* This is the name of the NetCDF file we will write. */
 #define WR_FILE_NAME "NetCDF-Project/cmcc-med-final.nc"
-
-#define FILES_FOLDER "NetCDF-Project/CMCC-CM2-SR5_historical"
+/* This is the name of the folder containing all the datasets that we will read */
+#define FILES_FOLDER "NetCDF-Project/CMCC-CM2-SR5_historical/"
 
 /* We are reading 3D data, a 1 x 192 x 288 lvl-lat-lon grid, with 9125 timesteps of data. */
 #define NDIMS 3
@@ -30,9 +27,9 @@
 #define NLON 288
 #define LAT_NAME "lat"
 #define LON_NAME "lon"
-//#define NREC 9125
 #define REC_NAME "time"
 
+/* THe number of dimensions that the output file will have */
 #define NDIMSWR 2
 
 /* Names of things. */
@@ -65,8 +62,6 @@ float time_diff(struct timeval *start, struct timeval *end)
 
 int main(int argc, char *argv[])
 {
-    //int thread_count = strtol(argv[1], NULL, 10);
-    
     /* MPI  inizialization */
     MPI_Init(&argc, &argv);
 
@@ -80,14 +75,11 @@ int main(int argc, char *argv[])
     int name_len;
     MPI_Get_processor_name(processor_name, &name_len);
 
-
-    // Print off a hello world message
+    // Print off a hello world message with processor name
     printf("greetings:  %s, rank %d out of %d processors\n",
            processor_name, rank, size);
 
-
     /* reading files from specific directory containing NetCDF matrices */
-
     struct dirent *file; // Pointer for directory entry
 
     // opendir() returns a pointer of DIR type.
@@ -122,11 +114,10 @@ int main(int argc, char *argv[])
         if (file->d_type == DT_REG)
         {
             char name[250]; //variable containing the file path
-            strcpy(name, "NetCDF-Project/CMCC-CM2-SR5_historical/");
+            strcpy(name, FILES_FOLDER);
             strcat(name, file->d_name);                            // append the name of file onto the folder path
             filesList[counter] = (char *)malloc(strlen(name) + 1); //allocating memory for filesList individual elements.
             strncpy(filesList[counter], name, strlen(name));
-            //filesList[counter] = name;
             counter++;
         }
     closedir(directory);
@@ -138,20 +129,16 @@ int main(int argc, char *argv[])
     struct timeval endtime;
     struct timeval endtime2;
     double elapsed_time = 0;
-    double total_time = 0;    
+    double total_time = 0;
     gettimeofday(&starttime2, NULL); //start timer of rank 0
-    /*
-    for (int i = 0; i < file_count; i++)
-    {
-        printf("String: %s\n", filesList[i]);
-    }*/
 
-    /*array of matrices containing all the different output average matrices calculated for each file (25 years) */
+    /*array of matrices containing all the different output average matrices calculated for each file*/
     float *final_averages = malloc(file_count * NLAT * NLON * sizeof(float));
 
     /* These program variables hold the latitudes and longitudes. */
     float lats[NLAT], lons[NLON];
 
+    /* This array will hold the number of records for each iteration, it will be used to calculate the final averages */
     int nrec_array[file_count];
 
     double total_time_reading;
@@ -224,7 +211,6 @@ int main(int argc, char *argv[])
 
         /* end of setup of NetCDF reading */
 
-    
         double elapsed_time_reading = 0; //variable containing the local sum of all elapsed time for reading
         double elapsed_time_matrix = 0;  //variable containing the local sum of all elapsed time for writing the sum matrix
 
@@ -244,7 +230,6 @@ int main(int argc, char *argv[])
             limit = nrec;
         }
 
-        //printf("Limit: %d\n", limit);
         int threadnumb = omp_get_num_threads();
         /* only master process writes general info about current iteration */
         if (rank == 0)
@@ -254,8 +239,6 @@ int main(int argc, char *argv[])
             printf("Number of threads: %d \n", threadnumb);
             gettimeofday(&starttime3, NULL); //start timer of rank0
         }
-
-        
 
         /* Read and check one record at a time.
             if 125 processes, rank 0 from day 0 to day 72, rank 1 from 73 to 145 ... */
@@ -273,21 +256,17 @@ int main(int argc, char *argv[])
             gettimeofday(&endtime, NULL);
             elapsed_time = time_diff(&starttime, &endtime);
             elapsed_time_reading += elapsed_time;
-            //printf("Tempo lettura: %.7f\n\n", elapsed_time);
 
             /* start elaboration timer */
             gettimeofday(&starttime, NULL);
 
-            /* population of sum matrix */
-            #  pragma omp parallel for collapse(2) private(i, k) reduction(+:sum) schedule(guided)
+/* population of sum matrix */
+#pragma omp parallel for collapse(2) private(i, k) reduction(+ \
+                                                             : sum) schedule(guided)
             for (i = 0; i < NLAT; i++)
-            {   
-                
+            {
                 for (k = 0; k < NLON; k++)
                 {
-                    //int my_rank = omp_get_thread_num();
-                    //int thread_count = omp_get_num_threads();
-                    //printf("Hello from thread %d of %d \n", my_rank, thread_count);
                     sum[i][k] += prec_in[i][k];
                 }
             }
@@ -296,40 +275,28 @@ int main(int argc, char *argv[])
             gettimeofday(&endtime, NULL);
             elapsed_time = time_diff(&starttime, &endtime);
             elapsed_time_matrix += elapsed_time;
-            //printf("Tempo creazione matrice: %.7f\n\n", elapsed_time);
-
         } /* next record */
 
         //pointer to sum matrix, to consider the matrix as an array.
         int *array_matr = (int *)sum;
 
-        //one-dimensional array containing the output of Reduce operation
-        //float arraytot[NLAT * NLON];
-
-        //matrix recreated from mono-dim array
-        //float final_sum_matrix[NLAT][NLON] = {{0}};
-
         double sum_readtimes;        // variable containing the output of reduce operation, collecting all reading times of different processes
         double sum_elaborationtimes; // variable containing the output of reduce operation, collecting all elaboration times of different processes
-
-        
 
         /* three MPI_Reduce, to collect the local contibutes of reading timer, elaboration timer, and most importantly the local sum matrix. */
         MPI_Reduce(&elapsed_time_reading, &sum_readtimes, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
         MPI_Reduce(&elapsed_time_matrix, &sum_elaborationtimes, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-        
+
         gettimeofday(&starttime, NULL); // start communication timer
         MPI_Reduce(array_matr, &final_averages[counter * NLAT * NLON], NLAT * NLON, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
         /*end of communication timer and calculation of elapsed time */
         gettimeofday(&endtime, NULL);
         elapsed_time = time_diff(&starttime, &endtime);
 
-        //printf("Tempo comunicazione: %.7f num. proc: %d \n\n", elapsed_time, rank);
-
-         if (rank == 0)
+        if (rank == 0)
         {
-            total_time_reading+= sum_readtimes / size ;
-            total_time_elaboration+=sum_elaborationtimes / size;
+            total_time_reading += sum_readtimes / size;
+            total_time_elaboration += sum_elaborationtimes / size;
             printf("Average reading time per process: %.7f\n", sum_readtimes / size);
             printf("Average elaboration of sum matrix per process: %.7f\n\n", sum_elaborationtimes / size);
             gettimeofday(&endtime, NULL);
@@ -340,74 +307,10 @@ int main(int argc, char *argv[])
 
         if ((retval = nc_close(ncid)))
             ERR(retval);
-
-        /*printf("My rank: %d\n" , rank);
-        printf("Tempo totale di lettura matrici: %.7f\n", elapsed_time_lettura);
-        printf("Tempo totale di scrittura matrice media: %.7f\n\n", elapsed_time_matrice);
-        */
-
-        /* only master process will execute this */
-        // if (rank == 0)
-        // {
-        //     printf("Average reading time per process: %.7f\n", sum_readtimes / size);
-        //     printf("Average elaboration of sum matrix per process: %.7f\n", sum_elaborationtimes / size);
-
-        //     //regeneration of sum matrix from mono-dim array
-        //     gettimeofday(&starttime, NULL);
-        //     /*for (i = 0; i < NLAT; ++i)
-        //     {
-        //         for (k = 0; k < NLON; ++k)
-        //         {
-        //             final_sum_matrix[i][k] = arraytot[i * NLON + k];
-        //         }
-        //     }*/
-
-        //     // from sum matrix, calculation of average by dividing by the number of days
-        //     /*for (i = 0; i < NLAT; i++)
-        //     {
-        //         for (k = 0; k < NLON; k++)
-        //         {
-        //             final_sum_matrix[i][k] = (final_sum_matrix[i][k] / nrec) * 86400; //conversion of unit, from kg m-2 s-1 to mm/day
-        //         }
-        //     }*/
-
-        //     for (i = counter * NLAT * NLON; i < (counter + 1) * NLAT * NLON; i++)
-        //     {
-        //         arraytot[i] *= 86400 / nrec; //conversion of unit, from kg m-2 s-1 to mm/day
-        //     }
-
-        //     gettimeofday(&endtime, NULL);
-        //     elapsed_time = time_diff(&starttime, &endtime);
-        //     printf("Time for average calculation: %.7f\n\n", elapsed_time);
-
-        //     /* end of rank0 timer */
-        //     gettimeofday(&endtime2, NULL);
-        //     elapsed_time = time_diff(&starttime2, &endtime2);
-        //     printf("Total elaboration time of master process: %.7f\n\n", elapsed_time);
-
-        //     //print average matrix
-        //     /*
-        //     for(i = 0; i < NLAT; i++) {
-        //         for (k = 0; k < NLON; k++) {
-        //             printf("%.7f \t", final_averages[counter][i][k]);
-        //         }
-        //         fflush(stdout); 
-        //         printf("\n");
-        //     }
-            
-        //     */
-
-        //     /* Close the file. */
-        //     if ((retval = nc_close(ncid)))
-        //         ERR(retval);
-        // }
-
-        //MPI_Barrier(MPI_COMM_WORLD);
     }
 
     if (rank == 0)
     {
-
         // Master average matrix to calculate the final average from the final_averages matrix
         float *master_average = calloc(NLAT * NLON, sizeof(float));
 
@@ -416,17 +319,16 @@ int main(int argc, char *argv[])
         for (i = 0; i < file_count; i++)
         {
             float *average = final_averages + i * (NLAT * NLON);
-            for (j = 0; j < NLAT * NLON; j++) {
+            for (j = 0; j < NLAT * NLON; j++)
+            {
                 master_average[j] += average[j] * 86400 / nrec_array[i] / file_count;
             }
-
         }
-        //printf("%.7f \t", master_average);
+
         /* Writing of average matrix into a new nc file */
-        
         int ncid_wr, prec_varid_wr;
         int lat_varid_wr, lon_varid_wr, lon_dimid, lat_dimid;
- 
+
         int dimids_wr[NDIMSWR];
 
         /* Error handling. */
@@ -491,13 +393,11 @@ int main(int argc, char *argv[])
         elapsed_time = time_diff(&starttime, &endtime);
         printf("Writing NetCDFfile misuration time : %.7f\n\n", elapsed_time);
 
-        printf("Total average reading time: %.7f\n\n", total_time_reading/file_count);
-        printf("Total average elaboration time: %.7f\n\n", total_time_elaboration/file_count);
+        printf("Total average reading time: %.7f\n\n", total_time_reading / file_count);
+        printf("Total average elaboration time: %.7f\n\n", total_time_elaboration / file_count);
         gettimeofday(&endtime2, NULL);
         total_time = time_diff(&starttime2, &endtime2);
         printf("Total elaboration time of master process: %.7f\n\n", total_time);
-
-        
     }
     MPI_Finalize();
     return 0;
