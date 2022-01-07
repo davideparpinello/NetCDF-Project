@@ -1,0 +1,3 @@
+[submodule "NetCDF-HPC-Report"]
+	path = NetCDF-HPC-Report
+	url = https://github.com/davideparpinello/NetCDF-HPC-Report
