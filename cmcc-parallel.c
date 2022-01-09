@@ -232,9 +232,9 @@ int main(int argc, char *argv[])
 
         int threadnumb;
         /* Get the total number of active threads in the program */
-        #pragma omp parallel {
-            threadnumb = omp_get_num_threads();
-        }
+#pragma omp parallel 
+        threadnumb = omp_get_num_threads();
+
         /* only master process writes general info about current iteration */
         if (rank == 0)
         {
@@ -384,14 +384,16 @@ int main(int argc, char *argv[])
         if ((retval = nc_put_var_float(ncid_wr, lon_varid_wr, &lons[0])))
             ERR(retval);
 
-        /* Write the pretend data. This will write our surface pressure and surface temperature data. The arrays of data are the same size
-        as the netCDF variables we have defined. */
+        /* Write the precipitation average calculated before into the netCDF file */
         if ((retval = nc_put_var_float(ncid_wr, prec_varid_wr, master_average)))
             ERR(retval);
 
         /* Close the file. */
         if ((retval = nc_close(ncid_wr)))
             ERR(retval);
+
+        free(final_averages);
+        free(master_average);
 
         gettimeofday(&endtime, NULL);
         elapsed_time = time_diff(&starttime, &endtime);
