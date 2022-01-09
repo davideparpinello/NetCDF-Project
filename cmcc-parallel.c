@@ -392,9 +392,6 @@ int main(int argc, char *argv[])
         if ((retval = nc_close(ncid_wr)))
             ERR(retval);
 
-        free(final_averages);
-        free(master_average);
-
         gettimeofday(&endtime, NULL);
         elapsed_time = time_diff(&starttime, &endtime);
         printf("Writing NetCDFfile misuration time : %.7f\n\n", elapsed_time);
@@ -404,7 +401,14 @@ int main(int argc, char *argv[])
         gettimeofday(&endtime2, NULL);
         total_time = time_diff(&starttime2, &endtime2);
         printf("Total elaboration time of master process: %.7f\n\n", total_time);
+        free(master_average);
     }
+
+    free(final_averages);
+    for(counter = 0; counter < file_count; counter++) {
+        free(filesList[counter]);
+    }
+
     MPI_Finalize();
     return 0;
 }
