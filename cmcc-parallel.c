@@ -264,9 +264,8 @@ int main(int argc, char *argv[])
             /* start elaboration timer */
             gettimeofday(&starttime, NULL);
 
-/* population of sum matrix */
-#pragma omp parallel for collapse(2) private(i, k) reduction(+ \
-                                                             : sum) schedule(guided)
+            /* population of sum matrix */
+            #pragma omp parallel for collapse(2) private(i, k) reduction(+ : sum) schedule(guided)
             for (i = 0; i < NLAT; i++)
             {
                 for (k = 0; k < NLON; k++)
